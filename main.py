@@ -1,20 +1,38 @@
 from fastapi import FastAPI, Request
+import json
+import os
 
 app = FastAPI()
 
+STATE_FILE = "state.json"
+
 # =========================
-# Storage
+# Load State
 # =========================
 
-state = {}
+def load_state():
 
-# شكل البيانات:
-# {
-#   "AAPL": {
-#       "pending_1h": True,
-#       "position": "none"
-#   }
-# }
+    if os.path.exists(STATE_FILE):
+
+        with open(STATE_FILE, "r") as f:
+            return json.load(f)
+
+    return {}
+
+# =========================
+# Save State
+# =========================
+
+def save_state(state):
+
+    with open(STATE_FILE, "w") as f:
+        json.dump(state, f, indent=2)
+
+# =========================
+# Global State
+# =========================
+
+state = load_state()
 
 # =========================
 # Root
@@ -22,7 +40,10 @@ state = {}
 
 @app.get("/")
 async def root():
-    return {"status": "running"}
+    return {
+        "status": "running",
+        "state": state
+    }
 
 # =========================
 # Webhook
@@ -31,14 +52,20 @@ async def root():
 @app.post("/webhook")
 async def webhook(request: Request):
 
+    global state
+
     data = await request.json()
 
     symbol = data.get("symbol")
     signal_type = data.get("type")
     timeframe = data.get("timeframe")
 
-    # إنشاء حالة للسهم إذا غير موجود
+    # =========================
+    # Create Symbol State
+    # =========================
+
     if symbol not in state:
+
         state[symbol] = {
             "pending_1h": False,
             "position": "none"
@@ -50,7 +77,7 @@ async def webhook(request: Request):
     print(f"NEW ALERT: {data}")
 
     # =========================
-    # ENTRY SIGNALS
+    # ENTRY
     # =========================
 
     if signal_type == "entry":
@@ -70,7 +97,6 @@ async def webhook(request: Request):
                 if stock["position"] == "none":
 
                     stock["position"] = "long"
-                    stock["pending_1h"] = False
 
                     print(f"[{symbol}] ENTER TRADE")
 
@@ -83,7 +109,7 @@ async def webhook(request: Request):
                 print(f"[{symbol}] NO 1H CONFIRMATION")
 
     # =========================
-    # EXIT SIGNALS
+    # EXIT
     # =========================
 
     elif signal_type == "exit":
@@ -100,7 +126,13 @@ async def webhook(request: Request):
             print(f"[{symbol}] NO ACTIVE POSITION")
 
     # =========================
-    # DEBUG STATE
+    # SAVE STATE
+    # =========================
+
+    save_state(state)
+
+    # =========================
+    # DEBUG
     # =========================
 
     print(f"STATE: {state}")
