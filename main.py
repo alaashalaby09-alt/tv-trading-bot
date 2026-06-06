@@ -6,6 +6,9 @@ app = FastAPI()
 
 STATE_FILE = "state.json"
 
+HTF = "5m"
+LTF = "1m"
+
 # =========================
 # Load State
 # =========================
@@ -67,7 +70,7 @@ async def webhook(request: Request):
     if symbol not in state:
 
         state[symbol] = {
-            "pending_1h": False,
+            "pending_htf": False,
             "position": "none"
         }
 
@@ -75,6 +78,7 @@ async def webhook(request: Request):
 
     print("\n========================")
     print(f"NEW ALERT: {data}")
+    print(f"TIMEFRAME: {timeframe}")
 
     # =========================
     # ENTRY
@@ -82,17 +86,17 @@ async def webhook(request: Request):
 
     if signal_type == "entry":
 
-        # 1H confirmation
-        if timeframe == "1H":
+        # HTF confirmation
+        if timeframe == HTF:
 
-            stock["pending_1h"] = True
+            stock["pending_htf"] = True
 
-            print(f"[{symbol}] 1H CONFIRMED")
+            print(f"[{symbol}] HTF CONFIRMED")
 
-        # 15m execution
-        elif timeframe == "15m":
+        # LTF execution
+        elif timeframe == LTF:
 
-            if stock["pending_1h"]:
+            if stock["pending_htf"]:
 
                 if stock["position"] == "none":
 
@@ -106,7 +110,7 @@ async def webhook(request: Request):
 
             else:
 
-                print(f"[{symbol}] NO 1H CONFIRMATION")
+                print(f"[{symbol}] NO HTF CONFIRMATION")
 
     # =========================
     # EXIT
@@ -117,7 +121,7 @@ async def webhook(request: Request):
         if stock["position"] == "long":
 
             stock["position"] = "none"
-            stock["pending_1h"] = False
+            stock["pending_htf"] = False
 
             print(f"[{symbol}] EXIT TRADE")
 
