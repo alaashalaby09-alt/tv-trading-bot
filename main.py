@@ -6,142 +6,176 @@ app = FastAPI()
 
 STATE_FILE = "state.json"
 
-HTF = "5m"
-LTF = "1m"
+# =========================
+
+# TIMEFRAMES
 
 # =========================
-# Load State
+
+HTF = "1H"
+LTF = "15m"
+
+# =========================
+
+# LOAD STATE
+
 # =========================
 
 def load_state():
 
-    if os.path.exists(STATE_FILE):
+```
+if os.path.exists(STATE_FILE):
 
-        with open(STATE_FILE, "r") as f:
-            return json.load(f)
+    with open(STATE_FILE, "r") as f:
+        return json.load(f)
 
-    return {}
+return {}
+```
 
 # =========================
-# Save State
+
+# SAVE STATE
+
 # =========================
 
 def save_state(state):
 
-    with open(STATE_FILE, "w") as f:
-        json.dump(state, f, indent=2)
+```
+with open(STATE_FILE, "w") as f:
+    json.dump(state, f, indent=2)
+```
 
 # =========================
-# Global State
+
+# GLOBAL STATE
+
 # =========================
 
 state = load_state()
 
 # =========================
-# Root
+
+# ROOT
+
 # =========================
 
 @app.get("/")
 async def root():
-    return {
-        "status": "running",
-        "state": state
-    }
+
+```
+return {
+    "status": "running",
+    "HTF": HTF,
+    "LTF": LTF,
+    "state": state
+}
+```
 
 # =========================
-# Webhook
+
+# WEBHOOK
+
 # =========================
 
 @app.post("/webhook")
 async def webhook(request: Request):
 
-    global state
+```
+global state
 
-    data = await request.json()
+data = await request.json()
 
-    symbol = data.get("symbol")
-    signal_type = data.get("type")
-    timeframe = data.get("timeframe")
+symbol = data.get("symbol")
+signal_type = data.get("type")
+timeframe = data.get("timeframe")
+side = data.get("side")
 
-    # =========================
-    # Create Symbol State
-    # =========================
+if not symbol:
 
-    if symbol not in state:
+    return {
+        "success": False,
+        "error": "missing symbol"
+    }
 
-        state[symbol] = {
-            "pending_htf": False,
-            "position": "none"
-        }
+# =========================
+# CREATE SYMBOL
+# =========================
 
-    stock = state[symbol]
+if symbol not in state:
 
-    print("\n========================")
-    print(f"NEW ALERT: {data}")
-    print(f"TIMEFRAME: {timeframe}")
+    state[symbol] = {
+        "pending_htf": False,
+        "position": "none"
+    }
 
-    # =========================
-    # ENTRY
-    # =========================
+stock = state[symbol]
 
-    if signal_type == "entry":
+print("\n========================")
+print(f"NEW ALERT: {data}")
 
-        # HTF confirmation
-        if timeframe == HTF:
+# =========================
+# ENTRY
+# =========================
 
-            stock["pending_htf"] = True
+if signal_type == "entry":
 
-            print(f"[{symbol}] HTF CONFIRMED")
+    # HTF CONFIRMATION
 
-        # LTF execution
-        elif timeframe == LTF:
+    if timeframe == HTF:
 
-            if stock["pending_htf"]:
+        stock["pending_htf"] = True
 
-                if stock["position"] == "none":
+        print(f"[{symbol}] HTF CONFIRMED")
 
-                    stock["position"] = "long"
+    # LTF EXECUTION
 
-                    print(f"[{symbol}] ENTER TRADE")
+    elif timeframe == LTF:
 
-                else:
+        if stock["pending_htf"]:
 
-                    print(f"[{symbol}] ALREADY IN POSITION")
+            if stock["position"] == "none":
+
+                stock["position"] = "long"
+
+                print(f"[{symbol}] ENTER TRADE")
 
             else:
 
-                print(f"[{symbol}] NO HTF CONFIRMATION")
-
-    # =========================
-    # EXIT
-    # =========================
-
-    elif signal_type == "exit":
-
-        if stock["position"] == "long":
-
-            stock["position"] = "none"
-            stock["pending_htf"] = False
-
-            print(f"[{symbol}] EXIT TRADE")
+                print(f"[{symbol}] ALREADY IN POSITION")
 
         else:
 
-            print(f"[{symbol}] NO ACTIVE POSITION")
+            print(f"[{symbol}] NO HTF CONFIRMATION")
 
-    # =========================
-    # SAVE STATE
-    # =========================
+# =========================
+# EXIT
+# =========================
 
-    save_state(state)
+elif signal_type == "exit":
 
-    # =========================
-    # DEBUG
-    # =========================
+    if stock["position"] == "long":
 
-    print(f"STATE: {state}")
+        stock["position"] = "none"
 
-    return {
-        "success": True,
-        "state": state
-    }
+        # بعد الخروج ننتظر تأكيد HTF جديد
+        stock["pending_htf"] = False
+
+        print(f"[{symbol}] EXIT TRADE")
+
+    else:
+
+        print(f"[{symbol}] NO ACTIVE POSITION")
+
+# =========================
+# SAVE
+# =========================
+
+save_state(state)
+
+print(f"STATE: {state}")
+
+return {
+    "success": True,
+    "state": state
+}
+```
